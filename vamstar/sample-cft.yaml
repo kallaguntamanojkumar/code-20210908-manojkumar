@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  MyQueue:
+    Type: 'AWS::SQS::Queue'
+    Properties:
+      QueueName: "sample-cft-sqs"
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: sample-cft-s3-56473812345684324
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+    DeletionPolicy: Retain
+  MySNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+        TopicName: "sample-cft-sns"
+  LambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+  LambdaFunction:
+    Type: "AWS::Lambda::Function"
+    Properties: 
+        Code:
+            ZipFile: !Sub |
+                      import json
+                      import boto3
+                      import time
+                      
+                      s3 = boto3.client('s3')
+                      def lambda_handler(event, context):
+                          bucket = 'sample-cft-s3-56473812345684324'
+                          fileName = 'sample' + '.txt'
+                          uploadByteStream = bytes(json.dumps(event).encode('UTF-8'))
+                          s3.put_object(Bucket=bucket, Key=fileName, Body=uploadByteStream)
+                          print('Put Complete')
+                      
+        Description: Test with Cloud Formation
+        FunctionName: sample-cft-lambda
+        Handler: index.lambda_handler
+        Role: !GetAtt LambdaRole.Arn
+        Runtime: python3.6
+  LambdaFunctionEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt MyQueue.Arn
+      FunctionName: !GetAtt LambdaFunction.Arn
+  SnsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      Endpoint: !GetAtt MyQueue.Arn
+      Region: us-east-1
+      TopicArn: !Ref MySNSTopic
+
+  SampleSQSPolicy: 
+    Type: AWS::SQS::QueuePolicy
+    Properties: 
+      Queues: 
+        - !Ref MyQueue
+      PolicyDocument: 
+        Statement: 
+          - 
+            Action: 
+              - "SQS:*"
+            Effect: "Allow"
+            Resource: !GetAtt MyQueue.Arn
+            Principal:  
+              AWS: 
+                - "*" 
+      
+Outputs:
+  S3BucketSecureURL:
+    Value: !Join ['', ['https://', !GetAtt [S3Bucket, DomainName]]]
+    Description: Name of S3 bucket to hold website content

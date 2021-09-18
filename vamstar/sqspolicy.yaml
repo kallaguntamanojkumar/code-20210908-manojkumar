@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  SampleSQSPolicy: 
+    Type: AWS::SQS::QueuePolicy
+    Properties: 
+      Queues: 
+        - "https://sqs:us-east-2.amazonaws.com/771018596661/sample-cft-sqs"
+      PolicyDocument: 
+        Statement: 
+          - 
+            Action: 
+              - "SQS:SendMessage" 
+              - "SQS:ReceiveMessage"
+            Effect: "Allow"
+            Resource: "arn:aws:sqs:us-east-1:771018596661:sample-cft-sqs"
+            Principal:  
+              AWS: 
+                - "771018596661"  
